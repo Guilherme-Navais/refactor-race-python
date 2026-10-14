@@ -1,4 +1,4 @@
-# REFactor Race Python
+# Refactor Race Python
 
 ## EQUIPE
 - Guilherme de Oliveira Navais - 4251923674
