@@ -1,25 +1,22 @@
-# legacy_checkout.py
+from collections import Counter
 
 ORDERS_PROCESSED = []
 
 
+def calculate_subtotal(items):
+    return sum(item["price"] * item["qty"] for item in items if item["qty"] > 0)
+
+
+def find_duplicate_products(items):
+    counts = Counter(item["name"] for item in items)
+    return [name for name, count in counts.items() if count > 1]
+
+
 def process_order(customer, items, coupon="", state="MG", express=False):
-
-    # cálculo do subtotal
-    total1 = 0
-    for x in items:
-        if x["qty"] > 0:
-            total1 = total1 + (x["price"] * x["qty"])
-
-    # alguém colocou outro cálculo porque não confiava no primeiro
-    subtotal = 0
-    for x in items:
-        if x["qty"] > 0:
-            subtotal += x["price"] * x["qty"]
+    subtotal = calculate_subtotal(items)
 
     desconto = 0
 
-    # desconto por tipo de cliente
     if customer["type"] == "vip":
         if subtotal >= 1000:
             desconto = subtotal * 0.15
@@ -33,7 +30,6 @@ def process_order(customer, items, coupon="", state="MG", express=False):
                 if subtotal >= 800:
                     desconto = subtotal * 0.05
 
-    # cupons
     if coupon == "PROMO10":
         desconto = desconto + subtotal * 0.10
 
@@ -43,32 +39,28 @@ def process_order(customer, items, coupon="", state="MG", express=False):
     if coupon == "VIP50" and customer["type"] == "vip":
         desconto = desconto + 50
 
-    # desconto máximo permitido
     if desconto > subtotal * 0.25:
         desconto = subtotal * 0.25
 
     valor_com_desconto = subtotal - desconto
 
-    # peso total
     peso = 0
     for produto in items:
         peso += produto.get("weight", 0) * produto["qty"]
 
-    # frete
     frete = 0
 
-    if subtotal >= 500 and express == False:
+    if subtotal >= 500 and not express:
         frete = 0
     else:
-        if state == "MG" or state == "SP" or state == "RJ" or state == "ES":
+        if state in {"MG", "SP", "RJ", "ES"}:
             frete = 20 + peso * 0.4
         else:
             frete = 35 + peso * 0.6
 
-        if express == True:
+        if express:
             frete = frete * 1.8
 
-    # impostos
     taxa = 0
 
     if state == "MG":
@@ -84,23 +76,12 @@ def process_order(customer, items, coupon="", state="MG", express=False):
 
     imposto = valor_com_desconto * taxa
 
-    # pontos de fidelidade
-    pontos = 0
-
     if customer["type"] == "vip":
         pontos = int((valor_com_desconto + frete + imposto) / 5)
     else:
         pontos = int((valor_com_desconto + frete + imposto) / 10)
 
-    # procura produtos repetidos de forma bem pouco elegante
-    duplicados = []
-
-    for i in range(len(items)):
-        for j in range(len(items)):
-            if i != j:
-                if items[i]["name"] == items[j]["name"]:
-                    if items[i]["name"] not in duplicados:
-                        duplicados.append(items[i]["name"])
+    duplicados = find_duplicate_products(items)
 
     total_final = round(valor_com_desconto + frete + imposto, 2)
 
@@ -112,7 +93,7 @@ def process_order(customer, items, coupon="", state="MG", express=False):
         "tax": round(imposto, 2),
         "total": total_final,
         "points": pontos,
-        "duplicate_products": duplicados
+        "duplicate_products": duplicados,
     }
 
     ORDERS_PROCESSED.append(resultado)
